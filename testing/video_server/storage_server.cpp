@@ -1,11 +1,11 @@
 // storage_server.cpp
 #include <iostream>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <cstring>
+#include <sys/sendfile.h>
 
 int main() {
     const int port = 8080;
@@ -18,10 +18,6 @@ int main() {
     struct stat st{};
     if (fstat(fd, &st) < 0) { perror("fstat"); close(fd); return 1; }
     size_t fileSize = st.st_size;
-
-    // Memory-map the file
-    void* map = mmap(nullptr, fileSize, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (map == MAP_FAILED) { perror("mmap"); close(fd); return 1; }
 
     // HTTP server
     int server = socket(AF_INET, SOCK_STREAM, 0);
@@ -53,13 +49,19 @@ int main() {
 
         send(client, header.c_str(), header.size(), 0);
 
-        // Send video from memory-mapped file (zero-copy in kernel)
-        send(client, map, fileSize, 0);
+        // Use sendfile for zero-copy transfer
+        off_t offset = 0;
+        while (offset < fileSize) {
+            ssize_t sent = sendfile(client, fd, &offset, fileSize - offset);
+            if (sent <= 0) {
+                perror("sendfile");
+                break;
+            }
+        }
 
         close(client);
     }
 
-    munmap(map, fileSize);
     close(fd);
     close(server);
     return 0;
