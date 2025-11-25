@@ -248,7 +248,7 @@ int main() {
     crow::SimpleApp app;
     
     const std::string test_file = "test_file.bin";
-    const size_t FILE_SIZE_MB = 10; // 10MB test file
+    const size_t FILE_SIZE_MB = 1000; // 1000MB test file
     
     // Create test file if it doesn't exist
     struct stat buffer;
